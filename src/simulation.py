@@ -1,6 +1,6 @@
 import numpy as np
 import random
-import matplotlib.pyplot as plt
+from pathlib import Path
 
 class CabbageSimulator:
     def __init__(self, policy, max_O=5, max_A=5, p_cancel=0.15):
@@ -27,31 +27,39 @@ class CabbageSimulator:
             seed (int): Random seed for reproducibility
             
         Returns:
-            tuple: (total_profit, daily_profits)
+            tuple: (total_profit, daily_profits, metrics_dict)
         """
         random.seed(seed)
         state = (0, 0, 0, 0, 0, 0, 0)  # Initial state
         daily_profits = []
         total_profit = 0.0
+        
+        metrics = {
+            'deliveries': 0,
+            'missed_orders': 0,
+            'purchases': 0,
+            'cancellations': 0
+        }
 
-        for day in range(n_days):
-            # Get current state components
+        for _ in range(n_days):
             O1, O2, O3, A1, A2, c1, c2 = state
+            c1, c2 = int(c1), int(c2)
             
-            # Get action from policy
             accept, purchase = self.policy[O1, O2, O3, A1, A2, c1, c2]
             
-            # Calculate daily results
             arriving_cabbages = A1 if c1 == 0 else 0
             delivered = min(O1, arriving_cabbages)
             missed = O1 - delivered
             
-            # Calculate profit
+            metrics['deliveries'] += delivered
+            metrics['missed_orders'] += missed
+            metrics['purchases'] += purchase
+            metrics['cancellations'] += c1
+            
             day_profit = 4*delivered - missed - purchase
             total_profit += day_profit
             daily_profits.append(day_profit)
             
-            # Update state
             state = (
                 O2,                             # next O1
                 O3,                             # next O2
@@ -59,50 +67,46 @@ class CabbageSimulator:
                 A2,                             # next A1
                 min(purchase, self.max_A),      # next A2
                 c2,                             # next c1
-                random.random() < self.p_cancel # next c2
+                int(random.random() < self.p_cancel) # next c2
             )
             
-        return total_profit, daily_profits
+        for key in metrics:
+            metrics[key] /= n_days
+            
+        return total_profit, daily_profits, metrics
 
-    def plot_profits(self, daily_profits):
-        """Plot the daily profits over time."""
-        plt.figure(figsize=(10, 6))
-        plt.plot(daily_profits)
-        plt.xlabel("Day")
-        plt.ylabel("Profit")
-        plt.title("Daily Profits Over Time")
-        plt.grid(True)
-        plt.show()
+def run_simulations(n_days_list=[1000, 5000, 10000, 50000]):
+    """
+    Run multiple simulations with different durations.
+    
+    Args:
+        n_days_list (list): List of simulation durations to test
         
-        # Also show moving average
-        window = min(100, len(daily_profits))
-        moving_avg = np.convolve(daily_profits, 
-                                np.ones(window)/window, 
-                                mode='valid')
-        plt.figure(figsize=(10, 6))
-        plt.plot(moving_avg)
-        plt.xlabel("Day")
-        plt.ylabel(f"{window}-Day Moving Average Profit")
-        plt.title("Moving Average of Daily Profits")
-        plt.grid(True)
-        plt.show()
-
-def run_simulations(n_days_list=[100, 1000, 5000, 10000]):
-    """Run multiple simulations with different durations."""
-    # Load pre-computed policy
-    policy = np.load("../results/policy.npy")
+    Returns:
+        list: List of tuples containing (n_days, total_profit, daily_profits, metrics)
+    """
+    policy_path = Path('../results/policy.npy')
+    if not policy_path.exists():
+        raise FileNotFoundError("Policy file not found. Run value_iteration.py first.")
+    
+    policy = np.load(policy_path)
     simulator = CabbageSimulator(policy)
     
     results = []
     for n in n_days_list:
-        total, daily = simulator.simulate(n_days=n)
+        total, daily, metrics = simulator.simulate(n_days=n)
         avg_profit = total/n
-        print(f"For n_days={n:5d}, total profit={total:8.2f}, "
-              f"average profit/day={avg_profit:.3f}")
-        results.append((n, total, daily))
-    
-    # Plot results for the longest simulation
-    simulator.plot_profits(results[-1][2])
+        
+        print(f"\nSimulation Results ({n:,} days)")
+        print("-" * 40)
+        print(f"Total Profit: {total:,.2f}")
+        print(f"Average Daily Profit: {avg_profit:.2f}")
+        print("\nOperational Metrics (Daily Averages)")
+        print("-" * 40)
+        for key, value in metrics.items():
+            print(f"{key.replace('_', ' ').title():20}: {value:.2f}")
+        
+        results.append((n, total, daily, metrics))
     
     return results
 
