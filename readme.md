@@ -30,13 +30,16 @@ A Markov Decision Process (MDP) approach to the "Cabbage Merchant Problem," wher
 
 1. **Clone the Repository**
    ```bash
-   git clone <repo-url> cabbage-merchant-mdp
+   git clone https://github.com/ChengHua926/Sparc-2025-Write-Up.git cabbage-merchant-mdp
    cd cabbage-merchant-mdp
    ```
 
 2. **Create and Activate a Virtual Environment (Optional)**
    ```bash
    python -m venv venv
+   # On Windows:
+   venv\Scripts\activate
+   # On Unix or MacOS:
    source venv/bin/activate
    ```
 
